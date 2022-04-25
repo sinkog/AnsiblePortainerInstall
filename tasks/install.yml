@@ -1,0 +1,41 @@
+---
+- name: "Deploy Portainer to {{ inventory_hostname }}"
+  docker_container:
+    name: portainer
+    image: "portainer/portainer-ce:{{ protainer_version }}"
+    labels: "{{ container_labels | default(omit) }}"
+    state: started
+    detach: true
+    recreate: "{{ container_recreate }}"
+    restart_policy: "{{ container_restart_policy }}"
+    links: "{{ container_links | default(omit) }}"
+    networks: "{{ container_network | default(omit, True) }}"
+    networks_cli_compatible: no # avoid ansible 2.12. Deprecation warning
+    published_ports:
+      - "9000:9000"
+      - "8000:8000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - "{{ persistent_data_path }}"
+  register: portainer_docker
+
+# - name: "Debug return values from docker_container"
+#   debug:
+#     msg: "{{ portainer_docker.ansible_facts.docker_container }}"
+
+- name: Set prortainer is running
+  set_fact:
+    portainer_is_running: "{{ portainer_docker.ansible_facts.docker_container.State.Running }}"
+
+- name: Set pirtainter endpoints
+  set_fact:
+    portainer_endpoint: "http://s{{ portainer_docker.ansible_facts.docker_container.NetworkSettings.IPAddress }}:{{ host_port }}/api"
+
+- name: "Check!!!"
+  debug:
+    msg: "{{ portainer_is_running }} // {{ portainer_endpoint }}"
+
+- name: Check container status
+  fail:
+    msg: "Portainer did not start: {{ portainer_is_running }}"
+  when: not portainer_is_running
